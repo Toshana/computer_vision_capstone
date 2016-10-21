@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 ## OpenCV Tutorial
 
 # load a colour image in greyscale
-img = cv2.imread("C:/Users/Toshana/Documents/Udacity/computer_vision/toy_data/img1.jpg")
+img = cv2.imread("C:/Users/Toshana/Documents/Udacity/computer_vision/tutorials/toy_data/img1.jpg")
 print img
 
 cv2.imshow('image', img)
@@ -26,7 +26,7 @@ plt.imshow(img, cmap = "gray")
 plt.show()
 
 # accessing pixel value
-pine = cv2.imread("C:/Users/Toshana/Documents/Udacity/computer_vision/toy_data/img1.jpg")
+pine = cv2.imread("C:/Users/Toshana/Documents/Udacity/computer_vision/tutorials/toy_data/img1.jpg")
 px = pine[100, 100]
 blue = pine[100, 100, 0]
 
@@ -59,9 +59,32 @@ answer = (((g- avg)/std) * 10) + avg
 cv2.imwrite("answer.png", answer)
 
 # shift green to the left by 2 pixels
+rows = 512
+cols = 400 
+M = np.float32([[1,0,-2],[0,1,0]])
+dst = cv2.warpAffine(g, M, (cols,rows))
+ 
+cv2.imshow('g',dst)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
 
+# subtract the result from the original
+difference = g - dst
+cv2.imshow('difference', difference)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+cv2.imwrite("subtracted_difference.png", difference)
 
-
+# Take the original colored image (image 1) and start adding Gaussian noise to the pixels in the green channel. 
+# Increase sigma until the noise is somewhat visible
+row,col,ch= pine.shape
+mean = 0
+gauss = np.random.normal(mean,0.05,(row,col)) #this does not work
+gauss = gauss.reshape(row,col)
+g_noise = g + gauss
+cv2.imshow('gnoise', g_noise)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
 
 
 
