@@ -11,31 +11,60 @@ pg 122
 import cv2
 import numpy as np
 import os
-import sys
+from sklearn.cross_validation import train_test_split
+from sklearn import preprocessing
 
-# SIFT (generate descriptors)
+class trainData():
+    
+    def __init__(self):
+        self.files = []
+        self.labels = []
+        self.vocabulary_size = 102        
+        self.BOW = cv2.BOWKMeansTrainer(self.vocabulary_size)
+        
 
-#def create_descriptors(folder):
-#    files = []
-#    for (dirpath, dirnames, filenames) in walk(folder):
-#        files.extend(filenames)
-#        for f in files:
-#            save_descriptor(folder, f, cv2.ORB())
+    # Load dataset
+    def load_data(self, location):
+        for f in os.listdir(location):
+            new_location = location + '/' + f
+            for pic in os.listdir(new_location):
+                image = new_location + '/' + pic
+                self.files.append(cv2.imread(image, 0))
+                self.labels.append(f)
+    
+    # Create Training and Testing Data
+    
+    def split_data(self, x, y):
+        le = preprocessing.LabelEncoder()
+        le.fit_transform(y)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(x, y, test_size = 0.1, random_state = 7)
+                
+    # ORB (generate descriptors)
+                
+    def create_descriptors(self, x1, x2):
+        '''
+        
+        '''
+        self.orb = cv2.ORB()
+        count = 0
+        for f in x1:
+            count += 1
+            kp, des = self.orb.detectAndCompute(f, None)
+            self.BOW.add(des)
             
-def create_descriptors(file_location):
-    files = []
-    for name in os.listdir(file_location):
-        new_location = file_location + '\\' + name
-        for pic in os.listdir(new_location):
-            image = new_location +'\\' + pic
-            files.extend(image)
-            for f in files:
-                save_descriptor(file_location, f, cv2.ORB)
             
-def save_descriptor(folder, image_path, feature_detector):
-    img = cv2.imread(join(folder, image_path), 0)
-    keypoints, descriptors = feature_detector.detectAndCompute(img, None)
-    descriptor_file = image_path.replace("jpg", "npy")
-    np.save(join(folder, descriptor_file), descriptors)
-    dir = sys.argv[1]
-    create_descriptors(dir)
+            
+    img = "/home/centraltendency/Udacity/computer_vision_capstone/ObjectCategories/accordion/image_0001.jpg"
+    file_loc = "/home/centraltendency/Udacity/computer_vision_capstone/ObjectCategories"
+    des_loc = "/home/centraltendency/Udacity/computer_vision_capstone/descriptors/descriptor"
+    create_descriptors(file_loc, des_loc)
+    
+    
+    # Cluster the descriptors to create a codebook
+    
+    def create_codebook(BOW_trainer):
+        BOW.cluster()
+        
+            
+        
+    
