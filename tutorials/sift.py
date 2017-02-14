@@ -13,6 +13,7 @@ import numpy as np
 import os
 from sklearn.cross_validation import train_test_split
 from sklearn import preprocessing
+import pickle
 
 class trainData():
     
@@ -20,7 +21,8 @@ class trainData():
         self.files = []
         self.labels = []
         self.vocabulary_size = 102        
-        self.BOW = cv2.BOWKMeansTrainer(self.vocabulary_size)
+        self.BOW_train = cv2.BOWKMeansTrainer(self.vocabulary_size)
+        self.BOW_test = cv2.BOWKMeansTrainer(self.vocabulary_size)
         
 
     # Load dataset
@@ -41,30 +43,37 @@ class trainData():
                 
     # ORB (generate descriptors)
                 
-    def create_descriptors(self, x1, x2):
-        '''
-        
-        '''
-        self.orb = cv2.ORB()
-        count = 0
-        for f in x1:
-            count += 1
-            kp, des = self.orb.detectAndCompute(f, None)
-            self.BOW.add(des)
+    def create_descriptors(self, x, BOW):
+        sift = cv2.xfeatures2d.SIFT_create()
+        for f in x:
+            kp, des = sift.detectAndCompute(f, None)
+            BOW.add(des)
             
-            
-            
-    img = "/home/centraltendency/Udacity/computer_vision_capstone/ObjectCategories/accordion/image_0001.jpg"
-    file_loc = "/home/centraltendency/Udacity/computer_vision_capstone/ObjectCategories"
-    des_loc = "/home/centraltendency/Udacity/computer_vision_capstone/descriptors/descriptor"
-    create_descriptors(file_loc, des_loc)
-    
-    
     # Cluster the descriptors to create a codebook
     
-    def create_codebook(BOW_trainer):
-        BOW.cluster()
+    def create_codebook(self, BOW_trainer, file_name):
+        vocabulary = BOW_trainer.cluster()
+        fileObject = open(file_name, 'wb')
+        pickle.dump(vocabulary, fileObject)
+        fileObject.close()
         
+    def get_vocabulary(self, file_location):
+        fileObject = open(file_location, "r")
+        self.vocabulary = pickle.load(fileObject)
+        
+    def create_imgDescriptor(BOW, vocabulary):
+        sift2 = cv2.DescriptorExtractor_create("SIFT")
+        bf = cv2.BFMatcher(cv2.NORM_L2)
+        extractor = cv2.BOWImgDescriptorExtractor(sift2, bf)
+        extractor.setVocabulary(vocabulary)
+
+        
+            
+            
+
+    
+    
+
             
         
     
