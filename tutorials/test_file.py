@@ -4,7 +4,8 @@ Created on Wed Feb  1 15:26:28 2017
 
 @author: centraltendency
 """
-# >>> sys.path.remove('/usr/lib/python2.7/dist-packages')
+import sys
+sys.path.remove('/usr/lib/python2.7/dist-packages')
 
 
 import cv2
@@ -15,17 +16,12 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-files = []
-labels = []
-vocabulary_size = 101
-BOW_train = cv2.BOWKMeansTrainer(vocabulary_size)
-BOW_test = cv2.BOWKMeansTrainer(vocabulary_size)
-X_train = []
-X_test = []
-y_train = []
-y_test = []
 
 def load_data(location):
+    """
+    Takes the location of a directory with named folders of images.
+    Returns images and labels.     
+    """
     files = []
     labels = []    
     for f in os.listdir(location):
@@ -37,12 +33,18 @@ def load_data(location):
     return files, labels
             
 def split_data(x, y):
+    """
+    Takes images and labels and splits the data into training and testing sets.    
+    """
     le = preprocessing.LabelEncoder()
     new_y = le.fit_transform(y)
     X_train, X_test, y_train, y_test = train_test_split(x, new_y, test_size = 0.3, random_state = 12)
     return X_train, X_test, y_train, y_test    
     
 def create_descriptors(x, vocabulary_size):
+    """
+    Initialize K-Means Bag of Words trainer from OpenCV and adds SIFT descriptors for clustering.    
+    """
     BOW_train = cv2.BOWKMeansTrainer(vocabulary_size)
     sift = cv2.xfeatures2d.SIFT_create()
     for f in x:
@@ -50,7 +52,11 @@ def create_descriptors(x, vocabulary_size):
         BOW_train.add(des)
     return BOW_train
         
-def create_codebook(BOW_trainer, file_name):
+def create_codebook(BOW_train, file_name):
+    """
+    Clusters Bag of Words object.
+    Saves as pickle to location "file_name".
+    """
     vocabulary = BOW_train.cluster()
     fileObject = open(file_name, 'wb')
     pickle.dump(vocabulary, fileObject)
@@ -58,12 +64,18 @@ def create_codebook(BOW_trainer, file_name):
     return vocabulary
     
 def get_vocabulary(file_location):
+    """
+    Takes location of saved pickle and returns python object.    
+    """
     fileObject = open(file_location, "r")
     vocabulary = pickle.load(fileObject)
     return vocabulary
     
-train_labels = []
 def create_imgDescriptor(BOW, x):
+    """
+    Initializes SIFT detector and extractor along with the Brute Force matching algorithm.
+    Takes Bag of Words vocabulary and list of training images, and returns the SIFT descriptors for that vocabulary.
+    """
     detect = cv2.xfeatures2d.SIFT_create()    
     extract = cv2.xfeatures2d.SIFT_create()
     bf = cv2.BFMatcher(cv2.NORM_L2)
@@ -75,20 +87,47 @@ def create_imgDescriptor(BOW, x):
         des = extractor.compute(img, kp)
         train_data.extend(des)
     return train_data        
-     
-def bow_features(image_path, vocab):
+ 
+def create_flann_imgDescriptor(BOW, x):
+    """
+    Initializes SIFT detector and extractor along with the FLANN matching algorithm.
+    Takes Bag of Words vocabulary and list of training images, and returns the SIFT descriptors for that vocabulary.        
+    """
+    detect = cv2.xfeatures2d.SIFT_create()    
+    extract = cv2.xfeatures2d.SIFT_create()
+    FLANN_INDEX_KDTREE = 1
+    flann_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 4)
+    fm = cv2.FlannBasedMatcher(flann_params, {})
+    extractor = cv2.BOWImgDescriptorExtractor(extract, fm)
+    extractor.setVocabulary(BOW)
+    train_data = []
+    for img in x:        
+        kp = detect.detect(img, None)
+        des = extractor.compute(img, kp)
+        train_data.extend(des)
+    return train_data        
+
+    
+def bow_features(im, vocab):
+    """
+    Taken from "OpenCV Computer Vision with Python" by Joseph Howse.  
+    """
+    i = cv2.imread(im)
     extract = cv2.xfeatures2d.SIFT_create()
     detect = cv2.xfeatures2d.SIFT_create()    
-    bf = cv2.BFMatcher(cv2.NORM_L2)
-    extract_bow = cv2.BOWImgDescriptorExtractor(extract, bf)
+    FLANN_INDEX_KDTREE = 1
+    flann_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 4)
+    fm = cv2.FlannBasedMatcher(flann_params, {})
+    extract_bow = cv2.BOWImgDescriptorExtractor(extract, fm)
     extract_bow.setVocabulary(vocab)
-    im = cv2.imread(image_path, 0)
-    return extract_bow.compute(im, detect.detect(im))
+    return extract_bow.compute(i, detect.detect(i))
     
-def predict(image, vocabulary):
+def predict(image, vocabulary, trained_svm):
+    """
+    Taken from "OpenCV Computer Vision with Python" by Joseph Howse.  
+    """
     f = bow_features(image, vocabulary)
-    p = svm.predict(f)
-    print image, "\t", p[1][0][0]
+    p = trained_svm.predict(f)
     return p
         
 
@@ -99,6 +138,8 @@ pickle_loc = "/home/centraltendency/Udacity/computer_vision_capstone/training/BO
 test_loc = "/home/centraltendency/Udacity/computer_vision_capstone/training/BOW_test"
 train_loc = "/home/centraltendency/Udacity/computer_vision_capstone/training/BOW_train"
 y_encoded = "/home/centraltendency/Udacity/computer_vision_capstone/training/BOW_train1"
+bow_flann = "/home/centraltendency/Udacity/computer_vision_capstone/training/BOW_flann"
+bow_1000clusters = "/home/centraltendency/Udacity/computer_vision_capstone/training/BOW_1000"
 
 X, y = load_data(file_loc)
 
@@ -108,29 +149,32 @@ X, y = load_data(file_loc)
 
 X_train, X_test, y_train, y_test = split_data(X, y)
 
-BOW_train = create_descriptors(X_train, vocabulary_size)
+BOW_train = create_descriptors(X_train, 1000)
 # BOW_test = create_descriptors(X_test, vocabulary_size)
 
 #fileObject = open(pickle_loc, "r")
 #vocabulary = pickle.load(fileObject)
 
-vocabulary = create_codebook(BOW_train, y_encoded)
-vocabulary = get_vocabulary(y_encoded)
+vocabulary = create_codebook(BOW_train, bow_1000clusters)
+vocabulary = get_vocabulary(bow_1000clusters)
 
-train_data = create_imgDescriptor(vocabulary, X_train)
-test_data = create_imgDescriptor(vocabulary, X_test)
+train_data = create_flann_imgDescriptor(vocabulary, X_train)
+test_data = create_flann_imgDescriptor(vocabulary, X_test)
 
 # train svm with built in function
 
-svm = cv2.ml.SVM_create()
-svm.train(np.array(train_data), cv2.ml.ROW_SAMPLE, np.array(y_train))
+#svm = cv2.ml.SVM_create()
+#svm.train(np.array(train_data), cv2.ml.ROW_SAMPLE, np.array(y_train))
 
-predictions = predict(img, vocabulary)
+predictions = []
+for f in X:
+    p = predict(f, vocabulary)
+    predictions.extend(p)
 
 # Train SVM
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
-from sklearn.grid_search import GridSearchCV
+from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import classification_report
 
 
@@ -145,18 +189,13 @@ from sklearn.metrics import classification_report
 #d_dataset = xtestarray.reshape((nsamples, nx*ny))
 #xtest = d_dataset
 
-clf = SVC()
-clf.fit(np.array(train_data), np.array(y_train))
-predictions = clf.predict(np.array(test_data))
-
 
 pipeline = Pipeline([
         ('clf', SVC(kernel='rbf', gamma = 0.01, C = 100))
     ])
-print x.shape
 parameters = {
-    'clf__gamma': (0.001, 0.01, 0.1, 1, 10, 100, 1000),
-    'clf__C': (0.001, 0.01, 0.1, 1, 10, 100, 1000),
+    'clf__gamma': (0.001, 0.01, 0.1, 1, 10, 100),
+    'clf__C': (0.001, 0.01, 0.1, 1, 10, 100),
 }
 grid_search = GridSearchCV(pipeline, parameters, n_jobs = -1, verbose = 1, scoring = 'accuracy')
 grid_search.fit(np.array(train_data), np.array(y_train))
@@ -168,21 +207,15 @@ for param_name in sorted(parameters.keys()):
     predictions = grid_search.predict(np.array(test_data))
     print classification_report(y_test, predictions)
     
-## Naive Bayes
-    
-from sklearn.naive_bayes import MultinomialNB
-pipeline = Pipeline([
-        ('bayes', MultinomialNB(alpha = 1.0, fit_prior = True, class_prior = None))
-        ])
-parameters = {
-    'bayes__alpha': (0.0001, 0.01, 0.1, 1, 10, 100, 1000)
-}
-grid_search = GridSearchCV(pipeline, parameters, n_jobs = -1, verbose = 1, scoring = 'accuracy')
-grid_search.fit(np.array(train_data), np.array(y_train))
-print 'Best score: %0.3f' % grid_search.best_score_
-print 'Best parameters set:'
-best_parameters = grid_search.best_estimator_.get_params()
-for param_name in sorted(parameters.keys()):
-    print '\t%s: %r' % (param_name, best_parameters[param_name])
-    predictions = grid_search.predict(np.array(test_data))
-    print classification_report(y_test, predictions)
+clf = SVC(kernel = 'rbf', gamma = 10, C = 100)
+clf.fit(train_data, y_train)
+score = clf.score(test_data, y_test)
+
+#predictions_1 = clf.predict(test_data)
+#predictions_2 = clf.predict(train_data)
+#predictions_1 == y_test
+#predictions_2 == y_train
+
+## Testing
+
+example = predict(img, vocabulary, clf)
